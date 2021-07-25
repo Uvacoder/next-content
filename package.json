@@ -1,0 +1,55 @@
+{
+  "name": "next-content",
+  "version": "1.0.0",
+  "description": "Get your MDX files from specific dir and filter easily",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "scripts": {
+    "build": "rm -rf dist && npm run build:code && npm run build:types && npm run format && npm run clean:map",
+    "build:types": "tsc --emitDeclarationOnly --declaration --declarationDir dist",
+    "build:code": "swc src -s -d dist && prettier --write dist",
+    "clean:map": "rm -rf dist/**/*.map && rm -rf dist/*.map",
+    "format": "prettier --write {dist,src}",
+    "watch": "swc src -d dist -w"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/healthpackdev/next-content.git"
+  },
+  "keywords": [
+    "next-content",
+    "mdx",
+    "next",
+    "content-manager",
+    "git-based"
+  ],
+  "author": "Yasin Kadir Kılıç",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/healthpackdev/next-content/issues"
+  },
+  "homepage": "next-content.vercel.app",
+  "dependencies": {
+    "@mdx-js/mdx": "^1.6.22",
+    "@mdx-js/react": "^1.6.22",
+    "@swc/core": "^1.2.66",
+    "fast-glob": "^3.2.7",
+    "gray-matter": "^4.0.3"
+  },
+  "devDependencies": {
+    "@swc/cli": "^0.1.46",
+    "@types/mdx-js__react": "^1.5.4",
+    "@types/node": "^16.4.1",
+    "@types/react": "^17.0.15",
+    "chokidar": "^3.5.2",
+    "next": "^11.0.1",
+    "prettier": "^2.3.2",
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2"
+  },
+  "peerDependencies": {
+    "next": "10.0.0>=",
+    "react": "16>=",
+    "react-dom": "16>="
+  }
+}
