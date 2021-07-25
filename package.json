@@ -2,8 +2,8 @@
   "name": "next-content",
   "version": "1.0.0",
   "description": "Get your MDX files from specific dir and filter easily",
-  "main": "index.js",
-  "types": "index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "build": "rm -rf dist && npm run build:code && npm run build:types && npm run format && npm run clean:map",
     "build:types": "tsc --emitDeclarationOnly --declaration --declarationDir dist",
