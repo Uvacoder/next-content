@@ -1,163 +1,181 @@
-import fg from "fast-glob";
-import fs from "fs";
-import path from "path";
-import { parseMatter } from "./lib/utils";
-import { CompileResult, compile } from "./lib/compiler";
+import fg from 'fast-glob';
+import fs from 'fs';
+import path from 'path';
+import Utils from './lib/utils';
+import { QueryServer } from './lib/query-server';
 
 export interface NextContentOptions {
   /**
-   * path to all content files directory.
-   * @example directory: './content' // or 'content'
+   * absolute path to directory of content files.
+   * @example directory: 'content' // or './content' equal to {cwd}/content
    */
-  directory: string;
+  directory?: string;
 }
 
-interface ContentTemplate<F> {
-  data: F;
+export interface ContentTemplate<T = Record<string, any>> {
+  data: T;
   slug: string;
   content: string;
 }
 
-interface FetchResult<F = {}> {
-  data: F;
-  slug: string;
-  code: CompileResult;
+export interface ContentOptions {
+  /**
+   * @description includes sub directories in specified directory.
+   * @default false
+   */
+  deep?: boolean;
+  /**
+   * @description returns raw text of content files in text key in fetchResult
+   * @default false
+   */
+  text?: boolean;
+  /**
+   * @description skips the completion step and doesn't returns code key.
+   * @default false
+   */
+  skipCompile?: boolean;
 }
 
-export type ThisManager = Omit<NextContentManager, "content">;
-
-const extension = "mdx";
-
-export class NextContentManager<F = {}> {
-  private directory: NextContentOptions["directory"];
-  private cwd: string;
-  private currentContents: ContentTemplate<F>[];
-  private currentContent: ContentTemplate<F>;
+class NextContentManager {
+  private directory: NextContentOptions['directory'];
+  private cwd: string = process.cwd();
   private base: string;
 
   constructor(public options: NextContentOptions) {
     this.directory = options.directory;
-    this.cwd = process.cwd();
     this.base = path.join(this.cwd, this.directory);
   }
 
-  private path(...paths: string[]) {
-    for (const pathname of paths) {
-      const index = paths.indexOf(pathname);
-      const isLast = index === paths.length - 1;
-      console.log(path.join(this.base, pathname));
-      if (isLast && fs.statSync(path.join(this.base, pathname)).isFile()) {
-        paths[index] = `${pathname}.mdx`;
-      }
+  private path(
+    paths: string[],
+    options: { addExtension?: boolean } = { addExtension: true }
+  ) {
+    // ['articles', 'react',  'what-is-react'] to ['articles', 'react',  'what-is-react.mdx']
+    // { addExtension: false } - skip mapping
+    if (options.addExtension) {
+      paths = paths.map((pathname, index) => {
+        const isLast = index === paths.length - 1;
+        if (isLast) {
+          pathname = `${pathname}.mdx`;
+        }
+
+        return pathname;
+      });
     }
 
+    // {cwd}/content/articles/react/what-is-react.mdx if { addExtension: true }
     return path.join(this.base, ...paths);
   }
 
-  private isExist(...pathname: string[]) {
-    const fullPath = this.path(...pathname);
-    return {
-      exist: fs.existsSync(fullPath),
-      pathname: fullPath,
-    };
+  private isExist(pathname: string[]): { exist: boolean; directory: boolean } {
+    // test with no extension
+    const isDirectory = fs.existsSync(
+      this.path(pathname, { addExtension: false })
+    );
+
+    // if it's exist probably it's directory or extension-less file
+    if (isDirectory) {
+      return {
+        exist: true,
+        directory: true,
+      };
+    } else {
+      const absolutePathToFile = this.path(pathname);
+
+      return {
+        exist: fs.existsSync(absolutePathToFile),
+        directory: false,
+      };
+    }
   }
 
-  private slug(fullPath: string) {
-    return fullPath.replace(this.base, "");
+  private removeBase(fullPath: string) {
+    return fullPath.replace(this.base, '');
   }
 
-  private readContent(...file: string[]): ContentTemplate<F> {
-    const fullPath = this.path(...file);
-    const plainText = fs.readFileSync(fullPath, "utf8");
-    const { content, data } = parseMatter(plainText) as {
-      content: string;
-      data: F;
-    };
+  private slug(relative: string) {
+    return Utils.removeExtension(relative);
+  }
+
+  private readContent(relativePath: string): ContentTemplate {
+    const fullPath = this.path([relativePath]);
+
+    const plainText = fs.readFileSync(fullPath, 'utf8');
+    const { content, data } = Utils.parseMatter(plainText) as Omit<
+      ContentTemplate,
+      'slug'
+    >;
 
     return {
       content,
-      slug: this.slug(fullPath),
+      slug: this.slug(relativePath),
       data,
     };
   }
 
-  private readContents(files: string[]): ContentTemplate<F>[] {
-    const contents = [];
-
-    for (const file of files) {
-      console.log(files);
-      contents.push(this.readContent(file));
-    }
-
-    return contents;
+  private readContents(files: string[]): ContentTemplate[] {
+    return files.map((relativePath) => {
+      return this.readContent(Utils.removeExtension(relativePath));
+    });
   }
 
-  private reset() {
-    this.currentContents = null;
-    this.currentContent = null;
+  // not reusable function.
+  private parseContentParams(params: [...string[], ContentOptions | string]) {
+    const lastEl = params[params.length - 1];
+    const options = typeof lastEl === 'object' ? lastEl : {};
+
+    const fileOrDirectory = (
+      Object.keys(options).length ? params.slice(0, -1) : params
+    ) as string[];
+
+    return { options, fileOrDirectory };
   }
 
-  /**
-   *
-   */
-  public content(...fileOrDirectory: string[]): ThisManager {
-    const { exist, pathname } = this.isExist(...fileOrDirectory);
+  public content<T>(...pathOrOptions: [...string[], ContentOptions | string]) {
+    const { fileOrDirectory, options } = this.parseContentParams(pathOrOptions);
 
-    if (!exist) throw new Error(`Cannot find directory or file: ${pathname}`);
+    const { directory } = this.isExist(fileOrDirectory);
 
-    const contentPath = this.path(...fileOrDirectory);
+    const contentPath = this.path(fileOrDirectory, {
+      addExtension: !directory,
+    });
 
     const stats = fs.statSync(contentPath);
 
+    const contents = [];
+
     if (stats.isDirectory()) {
-      const files = fs.readdirSync(contentPath);
+      let files;
 
-      this.currentContents = this.readContents(files);
-    } else {
-      this.currentContent = this.readContent(...fileOrDirectory);
-    }
-
-    return this;
-  }
-
-  /**
-   * returns `content Array or content Object`
-   * @example
-   * const content = NextContent({
-   *    directory: "content",
-   * });
-   *
-   * content('articles', 'who-am-i').fetch() // { code: '...', slug: '/articles/who-am-i', data: { ... } }
-   */
-  public async fetch(): Promise<FetchResult<F>[] | FetchResult<F>> {
-    let pass: FetchResult<F> | FetchResult<F>[] = [];
-
-    const toFetchResult = async ({ content, slug, data }: ContentTemplate<F>): Promise<FetchResult<F>> => {
-      const code = await compile(content);
-
-      return {
-        code,
-        slug,
-        data,
-      };
-    };
-
-    if (this.currentContents) {
-      for (const contentTemplate of this.currentContents) {
-        pass.push(await toFetchResult(contentTemplate));
+      if (!options.deep) {
+        files = fg.sync('*.mdx', { cwd: contentPath });
+      } else {
+        files = fg.sync(`**.mdx`, { cwd: contentPath });
       }
-    } else if (this.currentContent) {
-      pass = await toFetchResult(this.currentContent);
+
+      // my-content.mdx to /articles/(sub-dir)?/my-content.mdx
+      const fullRelatives = files.map((fileName) => {
+        fileName = this.removeBase(path.join(contentPath, fileName));
+
+        return fileName;
+      });
+      contents.push(...this.readContents(fullRelatives));
+    } else {
+      const files = fileOrDirectory;
+
+      // select last element and remove .mdx extension.
+      const filePath = this.slug(files.join('/'));
+
+      contents.push(this.readContent(filePath));
     }
 
-    if (!pass) throw new Error("No content to fetch");
-
-    this.reset();
-    return pass;
+    return new QueryServer<T>(contents, options);
   }
 }
 
-export const NextContent = <T>(options: NextContentOptions): NextContentManager["content"] => {
-  const nextContentManager = new NextContentManager<T>(options);
-  return nextContentManager.content.bind(nextContentManager);
+export const NextContent = (
+  options: NextContentOptions
+): NextContentManager['content'] => {
+  const manager = new NextContentManager(options);
+  return manager.content.bind(manager);
 };
