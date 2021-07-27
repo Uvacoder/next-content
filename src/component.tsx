@@ -1,6 +1,6 @@
-import React, { useMemo } from "react";
-import type { CompileResult } from "./lib/compiler";
-import { MDXProvider, mdx } from "@mdx-js/react";
+import React, { useMemo } from 'react';
+import type { CompileResult } from './lib/compiler';
+import { MDXProvider, mdx } from '@mdx-js/react';
 
 export interface MDXComponentProps {
   /**
@@ -20,9 +20,7 @@ export interface MDXComponentProps {
    */
   scope?: Record<string, unknown>;
   /**
-   * The result of `await compile('# Hello World').code`
-   *
-   * @example const MDXContent = (mdx, React) => mdx('h1', {}, 'Hello World');
+   * The result of compile.
    */
   code: CompileResult;
 }
