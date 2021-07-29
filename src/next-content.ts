@@ -3,8 +3,9 @@ import fs from 'fs';
 import path from 'path';
 import Utils from './lib/utils';
 import { QueryServer } from './lib/query-server';
+import { CompileOptions } from './lib/compiler';
 
-export interface NextContentOptions {
+export interface NextContentOptions extends CompileOptions {
   /**
    * absolute path to directory of content files.
    * @example directory: 'content' // or './content' equal to {cwd}/content
@@ -14,8 +15,9 @@ export interface NextContentOptions {
 
 export interface ContentTemplate<T = Record<string, any>> {
   data: T;
+  path: string;
   slug: string;
-  content: string;
+  text: string;
 }
 
 export interface ContentOptions {
@@ -37,13 +39,12 @@ export interface ContentOptions {
 }
 
 class NextContentManager {
-  private directory: NextContentOptions['directory'];
   private cwd: string = process.cwd();
   private base: string;
 
   constructor(public options: NextContentOptions) {
-    this.directory = options.directory;
-    this.base = path.join(this.cwd, this.directory);
+    this.options = options;
+    this.base = path.join(this.cwd, this.options.directory);
   }
 
   private path(
@@ -93,23 +94,22 @@ class NextContentManager {
     return fullPath.replace(this.base, '');
   }
 
-  private slug(relative: string) {
-    return Utils.removeExtension(relative);
+  private slug(absolute: string) {
+    return Utils.removeExtension(`/${absolute}`);
   }
 
   private readContent(relativePath: string): ContentTemplate {
     const fullPath = this.path([relativePath]);
-
     const plainText = fs.readFileSync(fullPath, 'utf8');
-    const { content, data } = Utils.parseMatter(plainText) as Omit<
-      ContentTemplate,
-      'slug'
-    >;
+    const { content, data } = Utils.parseMatter(plainText);
+
+    const slug = this.slug(relativePath.split('/').slice(2).join('/'));
 
     return {
-      content,
-      slug: this.slug(relativePath),
+      text: content,
+      slug,
       data,
+      path: slug.slice(1),
     };
   }
 
@@ -148,9 +148,9 @@ class NextContentManager {
       let files;
 
       if (!options.deep) {
-        files = fg.sync('*.mdx', { cwd: contentPath });
+        files = fg.sync('*.mdx', { cwd: contentPath, onlyFiles: true });
       } else {
-        files = fg.sync(`**.mdx`, { cwd: contentPath });
+        files = fg.sync(`**.mdx`, { cwd: contentPath, onlyFiles: true });
       }
 
       // my-content.mdx to /articles/(sub-dir)?/my-content.mdx
@@ -163,13 +163,15 @@ class NextContentManager {
     } else {
       const files = fileOrDirectory;
 
-      // select last element and remove .mdx extension.
-      const filePath = this.slug(files.join('/'));
+      const filePath = Utils.removeExtension(path.join(...files));
 
       contents.push(this.readContent(filePath));
     }
 
-    return new QueryServer<T>(contents, options);
+    return new QueryServer<T>(contents, {
+      content: options,
+      root: this.options,
+    });
   }
 }
 
