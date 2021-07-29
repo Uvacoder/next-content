@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import type { CompileResult } from './lib/compiler';
+import type { CompileOutput } from './lib/compiler';
 import { MDXProvider, mdx } from '@mdx-js/react';
 
 export interface MDXComponentProps {
@@ -16,19 +16,17 @@ export interface MDXComponentProps {
    * The key used will be the name accessible to MDX in brackets.
    *
    * @example { user: 'My User' } // will be accessible in the MDX as `<User username={user} />`.
-   * @default { ...{}, mdx, React }
+   * @default {}
    */
   scope?: Record<string, unknown>;
-  /**
-   * The result of compile.
-   */
-  code: CompileResult;
+
+  compiledContent: CompileOutput;
 }
 
 export const MDXComponent: React.FC<MDXComponentProps> = ({
   components = {},
   scope = {},
-  code,
+  compiledContent,
 }) => {
   const Content = useMemo(() => {
     const scopes = { ...scope, mdx, React };
@@ -41,14 +39,14 @@ export const MDXComponent: React.FC<MDXComponentProps> = ({
     //   ...MDXCompiledCode;
     //   return MDXContent;
     // }
-    const returnMdxContentStatement = `${code}; return MDXContent;`;
+    const returnMdxContentStatement = `${compiledContent}; return MDXContent;`;
     const hydrate = new Function(...parameters, returnMdxContentStatement);
 
     // returns MDXContent React Element.
     const MDXContent = hydrate(...parameterValues);
 
     return MDXContent;
-  }, [scope, code]);
+  }, [scope, compiledContent]);
 
   return (
     <MDXProvider components={components}>
