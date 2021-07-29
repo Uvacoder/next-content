@@ -1,29 +1,35 @@
-import { ContentTemplate, ContentOptions } from '../next-content';
-import { CompileResult, compile } from './compiler';
+import {
+  ContentTemplate,
+  ContentOptions,
+  NextContentOptions,
+} from '../next-content';
+import { CompileOutput, compile, CompileOptions } from './compiler';
 import { Query } from './query';
 
-export interface FetchResult<T> extends Omit<ContentTemplate<T>, 'content'> {
-  code?: CompileResult;
+export interface FetchResult<T = Record<string, unknown>>
+  extends Omit<ContentTemplate<T>, 'text'> {
+  compiledContent?: CompileOutput;
   text?: string;
 }
 
 export class QueryServer<T> extends Query<FetchResult<T>> {
-  private contentOptions: ContentOptions;
+  private options: {
+    root: NextContentOptions;
+    content: ContentOptions;
+  };
 
   constructor(
     contents: ContentTemplate<T>[],
-    contentOptions: ContentOptions = {}
+    options: QueryServer<T>['options']
   ) {
     super(
-      contents.map(({ data, slug, content }) => ({
-        data,
-        slug,
+      contents.map((rest) => ({
+        ...rest,
         code: undefined,
-        text: content,
       }))
     );
 
-    this.contentOptions = contentOptions;
+    this.options = options;
   }
 
   private async toFetchResult(
@@ -32,11 +38,14 @@ export class QueryServer<T> extends Query<FetchResult<T>> {
     const returns: FetchResult<T> = {
       slug: content.slug,
       data: content.data,
+      path: content.path,
     };
 
-    if (!this.contentOptions.skipCompile)
-      returns.code = await compile(content.text);
-    if (this.contentOptions.text) returns.text = content.text;
+    const compileOptions: CompileOptions = { ...this.options.root };
+
+    if (!this.options.content.skipCompile)
+      returns.compiledContent = await compile(content.text, compileOptions);
+    if (this.options.content.text) returns.text = content.text;
 
     return returns;
   }
@@ -62,17 +71,7 @@ export class QueryServer<T> extends Query<FetchResult<T>> {
     return await this.toFetchResult(firstContent);
   }
 
-  public params(): string[] {
-    const filteredContents = this.apply();
-
-    let params;
-
-    if (filteredContents.length) {
-      params = filteredContents.map((content) => content.slug);
-    } else {
-      throw new Error('You must have contents to get params.');
-    }
-
-    return params;
+  public params(): { path: string; slug: string }[] {
+    return this.only(['path', 'slug']).apply();
   }
 }
