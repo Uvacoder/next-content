@@ -1,2 +1,3 @@
-export * from "./component";
-export * from "./next-content";
+export * from './component';
+export * from './next-content';
+export * from './use-content';
