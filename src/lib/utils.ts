@@ -1,5 +1,5 @@
 import matter from 'gray-matter';
-import unset from 'lodash.unset';
+import set from 'lodash.set';
 
 class Utils {
   public static parseMatter(value: string): {
@@ -16,18 +16,36 @@ class Utils {
     return dotted.join('.');
   }
 
+  // manipulates the object and delete specified path
+  public static unset(ref: Record<string, any>, path: string) {
+    const keys = path.split('.');
+    const lastKey = keys.pop();
+
+    for (const key of keys) {
+      ref = ref[key];
+    }
+
+    delete ref[lastKey];
+
+    return ref;
+  }
+
+  private static clone(object: Record<string, any>) {
+    return JSON.parse(JSON.stringify(object));
+  }
+
   public static omit(object: Record<string, any>, blackList: string[]) {
-    const clone = { ...object };
+    const clone = this.clone(object);
 
     for (const path of blackList) {
-      unset(clone, path);
+      this.unset(clone, path);
     }
 
     return clone;
   }
 
   public static pick(object: Record<string, any>, whiteList: string[]) {
-    let clone = { ...object };
+    let clone = this.clone(object);
 
     const blackList = whiteList.filter((path) => !(path in clone));
     clone = this.omit(clone, blackList);
@@ -35,16 +53,29 @@ class Utils {
     return clone;
   }
 
-  public static getValue = (object: Record<string, any>, path: string) => {
+  public static getValue(object: Record<string, any>, path: string) {
+    let clone = this.clone(object);
     const keys = path.split('.');
-    let copy = { ...object };
 
     for (const key of keys) {
-      copy = copy[key];
+      clone = clone[key];
     }
 
+    return clone;
+  }
+
+  // set path to value deeply nested
+  public static setKey(
+    object: Record<string, any>,
+    path: string,
+    value: unknown
+  ) {
+    const copy = this.clone(object);
+
+    set(copy, path, value);
+
     return copy;
-  };
+  }
 
   public static orderBy(array: any[], path: string, order: 'asc' | 'desc') {
     const asc = order === 'asc';
