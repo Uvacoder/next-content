@@ -15,20 +15,6 @@ class Utils {
     return dotted.join('.');
   }
 
-  // manipulates the object and delete specified path
-  private static unset(ref: Record<string, any>, path: string) {
-    const keys = path.split('.');
-    const lastKey = keys.pop();
-
-    for (const key of keys) {
-      ref = ref[key];
-    }
-
-    delete ref[lastKey];
-
-    return ref;
-  }
-
   private static set(ref: Record<string, any>, path: string, value: unknown) {
     const keys = path.split('.');
     const lastKey = keys.pop();
@@ -38,8 +24,15 @@ class Utils {
     }
 
     ref[lastKey] = value;
+  }
 
-    return ref;
+  // manipulates the object and delete specified path
+  private static unset(ref: Record<string, any>, path: string) {
+    this.set(ref, path, undefined);
+
+    for (const undefinedKey of ref.filter((v) => v === undefined)) {
+      delete ref[undefinedKey];
+    }
   }
 
   private static clone(object: Record<string, any>) {
