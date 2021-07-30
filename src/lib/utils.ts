@@ -38,12 +38,25 @@ class Utils {
     delete ref[lastKey];
   }
 
-  private static clone(object: Record<string, any>) {
-    return JSON.parse(JSON.stringify(object));
+  // deep clone object resursive
+  private static deepClone(object: Record<string, any>) {
+    const clone = {};
+
+    for (const key in object) {
+      const value = object[key];
+
+      if (typeof value === 'object') {
+        clone[key] = this.deepClone(value);
+      } else {
+        clone[key] = value;
+      }
+    }
+
+    return clone;
   }
 
   public static omit(object: Record<string, any>, blackList: string[]) {
-    const clone = this.clone(object);
+    const clone = this.deepClone(object);
 
     for (const path of blackList) {
       this.unset(clone, path);
@@ -53,23 +66,21 @@ class Utils {
   }
 
   public static pick(object: Record<string, any>, whiteList: string[]) {
-    let clone = this.clone(object);
+    const blackList = whiteList.filter((path) => !(path in object));
 
-    const blackList = whiteList.filter((path) => !(path in clone));
-    clone = this.omit(clone, blackList);
-
-    return clone;
+    // omit already clones object we don't need to clone it again
+    return this.omit(object, blackList);
   }
 
   public static getValue(object: Record<string, any>, path: string) {
-    let clone = this.clone(object);
     const keys = path.split('.');
 
+    // we are don't changing value of object don't need clone
     for (const key of keys) {
-      clone = clone[key];
+      object = object[key];
     }
 
-    return clone;
+    return object;
   }
 
   // set path to value deeply nested
@@ -78,11 +89,7 @@ class Utils {
     path: string,
     value: unknown
   ) {
-    const copy = this.clone(object);
-
-    this.set(copy, path, value);
-
-    return copy;
+    this.set(object, path, value);
   }
 
   public static orderBy(array: any[], path: string, order: 'asc' | 'desc') {
