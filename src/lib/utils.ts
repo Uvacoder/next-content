@@ -1,5 +1,4 @@
 import matter from 'gray-matter';
-import set from 'lodash.set';
 
 class Utils {
   public static parseMatter(value: string): {
@@ -17,7 +16,7 @@ class Utils {
   }
 
   // manipulates the object and delete specified path
-  public static unset(ref: Record<string, any>, path: string) {
+  private static unset(ref: Record<string, any>, path: string) {
     const keys = path.split('.');
     const lastKey = keys.pop();
 
@@ -26,6 +25,19 @@ class Utils {
     }
 
     delete ref[lastKey];
+
+    return ref;
+  }
+
+  private static set(ref: Record<string, any>, path: string, value: unknown) {
+    const keys = path.split('.');
+    const lastKey = keys.pop();
+
+    for (const key of keys) {
+      ref = ref[key];
+    }
+
+    ref[lastKey] = value;
 
     return ref;
   }
@@ -72,7 +84,7 @@ class Utils {
   ) {
     const copy = this.clone(object);
 
-    set(copy, path, value);
+    this.set(copy, path, value);
 
     return copy;
   }
