@@ -28,11 +28,14 @@ class Utils {
 
   // manipulates the object and delete specified path
   private static unset(ref: Record<string, any>, path: string) {
-    this.set(ref, path, undefined);
+    const keys = path.split('.');
+    const lastKey = keys.pop();
 
-    for (const undefinedKey of ref.filter((v) => v === undefined)) {
-      delete ref[undefinedKey];
+    for (const key of keys) {
+      ref = ref[key];
     }
+
+    delete ref[lastKey];
   }
 
   private static clone(object: Record<string, any>) {
