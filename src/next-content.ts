@@ -4,6 +4,7 @@ import path from 'path';
 import Utils from './lib/utils';
 import { QueryServer } from './lib/query-server';
 import { CompileOptions } from './lib/compiler';
+import { parseToc } from './lib/plugins';
 
 export interface NextContentOptions extends CompileOptions {
   /**
@@ -11,11 +12,20 @@ export interface NextContentOptions extends CompileOptions {
    * @example directory: 'content' // or './content' equal to {cwd}/content
    */
   directory?: string;
+  /**
+   * Allowed content file extensions.
+   * @default ['.mdx']
+   */
+  extensions?: string[];
 }
 
 export interface ContentTemplate<T = Record<string, any>> {
-  data: T;
+  data: Partial<T>;
   path: string;
+  dir: string;
+  toc: { depth: number; text: string; id: string }[];
+  extension: string;
+  excerpt?: string;
   slug: string;
   text: string;
 }
@@ -31,141 +41,156 @@ export interface ContentOptions {
    * @default false
    */
   text?: boolean;
-  /**
-   * @description skips the completion step and doesn't returns code key.
-   * @default false
-   */
-  skipCompile?: boolean;
 }
 
 class NextContentManager {
   private cwd: string = process.cwd();
   private base: string;
+  private tree: {
+    files: string[];
+    dirs: string[];
+  };
 
   constructor(public options: NextContentOptions) {
-    this.options = options;
+    this.options = { extensions: ['.mdx'], ...options };
     this.base = path.join(this.cwd, this.options.directory);
+    this.tree = this.makeTree();
   }
 
-  private path(
-    paths: string[],
-    options: { addExtension?: boolean } = { addExtension: true }
-  ) {
-    // ['articles', 'react',  'what-is-react'] to ['articles', 'react',  'what-is-react.mdx']
-    // { addExtension: false } - skip mapping
-    if (options.addExtension) {
-      paths = paths.map((pathname, index) => {
-        const isLast = index === paths.length - 1;
-        if (isLast) {
-          pathname = `${pathname}.mdx`;
-        }
+  private makeTree() {
+    const pattern = '**';
 
-        return pathname;
-      });
-    }
+    // read all files in base directory
+    const globs = fg.sync(pattern, { cwd: this.base, onlyFiles: false });
 
-    // {cwd}/content/articles/react/what-is-react.mdx if { addExtension: true }
+    // filter globs by extensions
+    const files = globs.filter((shortPath) => {
+      return this.options.extensions.some((ext) => shortPath.endsWith(ext));
+    });
+
+    // filter globs that directory
+    const dirs = globs.filter((shortPath) => {
+      return fs.statSync(this.path(shortPath)).isDirectory();
+    });
+
+    return {
+      files,
+      dirs,
+    };
+  }
+
+  private path(...paths: string[]) {
     return path.join(this.base, ...paths);
   }
 
-  private isExist(pathname: string[]): { exist: boolean; directory: boolean } {
-    // test with no extension
-    const isDirectory = fs.existsSync(
-      this.path(pathname, { addExtension: false })
-    );
+  private withExtension(path: string) {
+    const extensions = this.options.extensions;
+    let extension: string;
 
-    // if it's exist probably it's directory or extension-less file
-    if (isDirectory) {
-      return {
-        exist: true,
-        directory: true,
-      };
-    } else {
-      const absolutePathToFile = this.path(pathname);
+    for (const ext of extensions) {
+      const isExist = fs.existsSync(this.path(path + ext));
 
-      return {
-        exist: fs.existsSync(absolutePathToFile),
-        directory: false,
-      };
+      // if the file with extension exist, return current ext.
+      if (isExist) {
+        extension = ext;
+        break;
+      }
     }
+
+    return path + extension;
   }
 
   private removeBase(fullPath: string) {
     return fullPath.replace(this.base, '');
   }
 
-  private slug(absolute: string) {
-    return Utils.removeExtension(`/${absolute}`);
-  }
+  private paths(shortPath: string) {
+    const slug = (str: string) => {
+      // /articles/react/what-is-react.mdx to react/what-is-react.mdx
+      return path.join(...str.split('/').slice(2));
+    };
 
-  private readContent(relativePath: string): ContentTemplate {
-    const fullPath = this.path([relativePath]);
-    const plainText = fs.readFileSync(fullPath, 'utf8');
-    const { content, data } = Utils.parseMatter(plainText);
-
-    const slug = this.slug(relativePath.split('/').slice(2).join('/'));
+    const noExt = Utils.removeExtension(shortPath);
 
     return {
-      text: content,
-      slug,
+      path: noExt,
+      extension: path.extname(shortPath),
+      dir: path.dirname(shortPath),
+      slug: slug(noExt),
+    };
+  }
+
+  private readContent(shortPath: string): ContentTemplate {
+    const fullPath = this.path(shortPath);
+
+    const plainText = fs.readFileSync(fullPath, 'utf8');
+
+    const { content: text, data, excerpt } = Utils.parseMatter(plainText);
+
+    const toc = parseToc(text);
+
+    const paths = this.paths(shortPath);
+
+    return {
+      text,
       data,
-      path: slug.slice(1),
+      toc,
+      excerpt: excerpt.length ? excerpt : undefined,
+      ...paths,
     };
   }
 
   private readContents(files: string[]): ContentTemplate[] {
-    return files.map((relativePath) => {
-      return this.readContent(Utils.removeExtension(relativePath));
+    return files.map((shortPath) => {
+      return this.readContent(shortPath);
     });
   }
 
   // not reusable function.
   private parseContentParams(params: [...string[], ContentOptions | string]) {
-    const lastEl = params[params.length - 1];
-    const options = typeof lastEl === 'object' ? lastEl : {};
+    const lastEl = params.pop();
+    const options = typeof lastEl === 'object' ? lastEl : undefined;
 
-    const fileOrDirectory = (
-      Object.keys(options).length ? params.slice(0, -1) : params
-    ) as string[];
+    const fileOrDirectory = options ? params : params.concat(lastEl);
 
-    return { options, fileOrDirectory };
+    return { options, fileOrDirectory: fileOrDirectory as string[] };
   }
 
   public content<T>(...pathOrOptions: [...string[], ContentOptions | string]) {
     const { fileOrDirectory, options } = this.parseContentParams(pathOrOptions);
 
-    const { directory } = this.isExist(fileOrDirectory);
+    const joinPath = path.join(...fileOrDirectory);
 
-    const contentPath = this.path(fileOrDirectory, {
-      addExtension: !directory,
-    });
-
-    const stats = fs.statSync(contentPath);
+    const isDirectory = this.tree.dirs.includes(joinPath);
+    const isFile = !isDirectory
+      ? // is filename startswith joinPath
+        this.tree.files.some((n) => n.startsWith(joinPath))
+      : false;
 
     const contents = [];
 
-    if (stats.isDirectory()) {
-      let files;
+    if (isDirectory) {
+      const files = this.tree.files
+        .map((name) => {
+          // if the deep option is not enabled and the directory length is greater than 1 return null
+          if (!options.deep && path.dirname(name).split('/').length > 1)
+            return null;
 
-      if (!options.deep) {
-        files = fg.sync('*.mdx', { cwd: contentPath, onlyFiles: true });
-      } else {
-        files = fg.sync(`**.mdx`, { cwd: contentPath, onlyFiles: true });
-      }
+          return this.removeBase(`/${name}`);
+        })
+        .filter((n) => n !== null);
 
-      // my-content.mdx to /articles/(sub-dir)?/my-content.mdx
-      const fullRelatives = files.map((fileName) => {
-        fileName = this.removeBase(path.join(contentPath, fileName));
+      contents.push(...this.readContents(files));
+    } else if (isFile) {
+      // add extension to joinPath
+      const file = this.withExtension(joinPath);
 
-        return fileName;
-      });
-      contents.push(...this.readContents(fullRelatives));
+      // join paths
+      const shortPath = path.join(file);
+
+      contents.push(this.readContent(shortPath));
     } else {
-      const files = fileOrDirectory;
-
-      const filePath = Utils.removeExtension(path.join(...files));
-
-      contents.push(this.readContent(filePath));
+      console.error(`${joinPath} not found in ${this.base}`);
     }
 
     return new QueryServer<T>(contents, {
