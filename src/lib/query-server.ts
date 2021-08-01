@@ -5,11 +5,20 @@ import {
 } from '../next-content';
 import { CompileOutput, compile, CompileOptions } from './compiler';
 import { Query } from './query';
+import Utils from './utils';
 
 export interface FetchResult<T = Record<string, unknown>>
   extends Omit<ContentTemplate<T>, 'text'> {
   compiledContent?: CompileOutput;
   text?: string;
+}
+
+export interface FetchOptions {
+  /**
+   * @description skips the completion step and doesn't returns compiledContent key.
+   * @default false
+   */
+  skipCompile?: boolean;
 }
 
 export class QueryServer<T> extends Query<FetchResult<T>> {
@@ -25,7 +34,7 @@ export class QueryServer<T> extends Query<FetchResult<T>> {
     super(
       contents.map((rest) => ({
         ...rest,
-        code: undefined,
+        compiledContent: undefined,
       }))
     );
 
@@ -33,42 +42,50 @@ export class QueryServer<T> extends Query<FetchResult<T>> {
   }
 
   private async toFetchResult(
-    content: FetchResult<T>
+    content: FetchResult<T>,
+    options: FetchOptions
   ): Promise<FetchResult<T>> {
-    const returns: FetchResult<T> = {
-      slug: content.slug,
-      data: content.data,
-      path: content.path,
-    };
+    const returns: FetchResult<T> = Utils.omit(content, [
+      'text',
+      'compiledContent',
+    ]) as Omit<FetchResult<T>, 'text' | 'compiledContent'>;
 
-    const compileOptions: CompileOptions = { ...this.options.root };
+    if (!options.skipCompile) {
+      returns.compiledContent = await compile(content.text, this.options.root);
+      if (content.excerpt)
+        returns.excerpt = await compile(content.excerpt, this.options.root);
+    }
 
-    if (!this.options.content.skipCompile)
-      returns.compiledContent = await compile(content.text, compileOptions);
     if (this.options.content.text) returns.text = content.text;
 
-    return returns;
+    // make it json serializable for next.js
+    return JSON.parse(JSON.stringify(returns));
   }
 
   /**
    * @description Ends the chain sequence and collects data.
    */
-  public async fetch(): Promise<FetchResult<T>[]> {
+  public async fetch(options: FetchOptions = {}): Promise<FetchResult<T>[]> {
     const contents: FetchResult<T>[] = [];
     const filteredContents = this.apply();
     if (filteredContents.length) {
       for (const content of filteredContents) {
-        contents.push(await this.toFetchResult(content));
+        if (content === null) {
+          contents.push(null);
+          continue;
+        }
+
+        contents.push(await this.toFetchResult(content, options));
       }
     }
 
     return contents;
   }
 
-  public async first(): Promise<FetchResult<T>> {
+  public async first(options: FetchOptions): Promise<FetchResult<T>> {
     const firstContent = this.apply()[0];
 
-    return await this.toFetchResult(firstContent);
+    return await this.toFetchResult(firstContent, options);
   }
 
   public params(): { path: string; slug: string }[] {
