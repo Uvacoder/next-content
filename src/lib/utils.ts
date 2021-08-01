@@ -1,18 +1,19 @@
 import matter from 'gray-matter';
+import path from 'path';
 
 class Utils {
-  public static parseMatter(value: string): {
-    content: string;
-    data: Record<string, unknown>;
-  } {
-    return matter(value);
+  public static parseMatter(value: string) {
+    return matter(value, {
+      excerpt: true,
+      excerpt_separator: '<!-- more -->',
+    });
   }
 
-  public static removeExtension(filename: string): string {
-    if (!filename.includes('.mdx')) return filename;
-    const dotted = filename.split('.');
-    dotted.pop();
-    return dotted.join('.');
+  // remove extension from file name
+  public static removeExtension(filename: string) {
+    const ext = path.extname(filename);
+
+    return filename.replace(ext, '');
   }
 
   private static set(ref: Record<string, any>, path: string, value: unknown) {
