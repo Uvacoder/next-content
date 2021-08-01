@@ -1,84 +1,10 @@
-import FlexSearch from 'flexsearch';
-import Utils from './utils';
+import Filters from './filters';
 
-const functions = {
-  skip(number, contents) {
-    // remove the first n items
-    return contents.slice(number);
-  },
+// ---------------------------------------------------------------------- \\
 
-  limit(number, contents) {
-    // get the first n items
-    return contents.slice(0, number);
-  },
-
-  only(fields, contents) {
-    // get only the specified fields
-    return contents.map((content) => Utils.pick(content, fields));
-  },
-
-  search({ field, search }, contents) {
-    const index = new FlexSearch.Index({
-      language: 'en',
-    });
-
-    for (const content of contents) {
-      const i = contents.indexOf(content);
-
-      const fieldValue = Utils.getValue(content, field);
-
-      index.add(i, fieldValue);
-    }
-
-    const contentIndexes = index.search(search.trim());
-
-    return contents.reduce((all: unknown[], currentContent, currentIndex) => {
-      if (contentIndexes.some((Index) => Index === currentIndex))
-        all.push(currentContent);
-
-      return all;
-    }, []) as unknown[];
-  },
-
-  sortBy({ field, direction }, contents) {
-    // order contents by field
-    return Utils.orderBy(contents, field, direction);
-  },
-
-  without(fields, contents) {
-    // exclude specified fields
-    return contents.map((content) => Utils.omit(content, fields));
-  },
-
-  surround({ path, options: { after, before } }, contents) {
-    const findWith = path.startsWith('/') ? 'slug' : 'path';
-    const main = contents.findIndex((content) => content[findWith] === path);
-
-    if (main === -1) {
-      return new Array(before + after).fill(null, 0);
-    }
-
-    const map = (n: 'prev' | 'next') => {
-      const isNext = n === 'next';
-
-      return new Array(isNext ? after : before).map((_, i) => {
-        i = i + 1;
-        const index = isNext ? main + i : main - i;
-
-        return contents[index] ? contents[index] : null;
-      });
-    };
-
-    const prevs = map('prev');
-    const nexts = map('next');
-
-    return [...prevs, ...nexts];
-  },
-};
-
-export class Query<P> {
+export class Query<P extends { data: Record<string, any> }> {
   private templates: P[];
-  private functions: { type: keyof typeof functions; value: any }[] = [];
+  private filters: { type: keyof Filters; value: any }[] = [];
   private postprocess: (() => void)[] = [];
 
   constructor(contents: P[]) {
@@ -86,7 +12,7 @@ export class Query<P> {
   }
 
   public skip(number: number) {
-    this.functions.push({
+    this.filters.push({
       type: 'skip',
       value: typeof number === 'string' ? parseInt(number) : number,
     });
@@ -95,7 +21,7 @@ export class Query<P> {
   }
 
   public limit(number: number) {
-    this.functions.push({
+    this.filters.push({
       type: 'limit',
       value: typeof number === 'string' ? parseInt(number) : number,
     });
@@ -104,7 +30,7 @@ export class Query<P> {
   }
 
   public only(fields: (keyof P | `data.${keyof P['data']}`)[]) {
-    this.functions.push({
+    this.filters.push({
       type: 'only',
       value: fields,
     });
@@ -117,7 +43,7 @@ export class Query<P> {
    * @returns this instance
    */
   public without(fields: (keyof P | `data.${keyof P['data']}`)[]) {
-    this.functions.push({
+    this.filters.push({
       type: 'without',
       value: fields,
     });
@@ -129,7 +55,7 @@ export class Query<P> {
    * @returns this instance
    */
   public search(field: keyof P | `data.${keyof P['data']}`, search: string) {
-    this.functions.push({
+    this.filters.push({
       type: 'search',
       value: {
         field,
@@ -147,7 +73,7 @@ export class Query<P> {
     field: keyof P | `data.${keyof P['data']}`,
     direction: 'asc' | 'desc' = 'asc'
   ) {
-    this.functions.push({
+    this.filters.push({
       type: 'sortBy',
       value: {
         field,
@@ -166,15 +92,15 @@ export class Query<P> {
     path: string,
     options: { before: number; after: number } = { before: 1, after: 1 }
   ) {
-    this.functions.push({
+    this.filters.push({
       type: 'surround',
       value: { path, options },
     });
 
     this.postprocess.push(() => {
       // if functions includes surround; remove limit, skip, search from functions
-      if (this.functions.some((fn) => fn.type === 'surround'))
-        this.functions = this.functions.filter((fn) => {
+      if (this.filters.some((fn) => fn.type === 'surround'))
+        this.filters = this.filters.filter((fn) => {
           return !(
             fn.type === 'limit' ||
             fn.type === 'skip' ||
@@ -182,15 +108,19 @@ export class Query<P> {
           );
         });
 
-      this.functions = this.functions.map((fn) => {
-        const fields = fn.value.fields;
+      this.filters = this.filters.map((fn) => {
+        const fields = fn.value.fields as string[];
+        const keys = ['slug', 'path'];
+
         if (fn.type === 'without') {
-          const slugIndex = fields.indexOf('slug');
-          if (slugIndex > -1) {
-            fields.splice(slugIndex, 1);
+          for (const key of keys) {
+            const index = fields.indexOf(key);
+            if (index > -1) {
+              fields.splice(index, 1);
+            }
           }
         } else if (fn.type === 'only') {
-          fields.push('slug');
+          fields.push(...keys);
         }
 
         return fn;
@@ -200,25 +130,42 @@ export class Query<P> {
     return this;
   }
 
+  process(
+    field:
+      | keyof P
+      | `data.${keyof P['data']}`
+      | ((content: P) => boolean | void | P),
+    fn?: (fieldValue: any) => boolean | void | P[keyof P]
+  ) {
+    this.filters.push({
+      type: 'process',
+      value: {
+        fn: typeof field === 'function' ? field : fn,
+        field: typeof field === 'string' ? field : undefined,
+      },
+    });
+
+    return this;
+  }
+
   /**
    * @description applies the queries to the contents
    */
-  public apply(): P[] {
-    // copy the contentTemplates to avoid change contentTemplates
-    let contents = [...this.templates];
-
+  public apply(): (P | null)[] {
     // manipulate the this with postprocess functions.
     for (const postprocess of this.postprocess) postprocess();
 
-    // apply queries dynamicly from this.functions
-    for (const { type, value } of this.functions) {
-      const query = functions[type];
+    // shallow copy the content templates to avoid change this.templates
+    const filters = new Filters([...this.templates]);
 
-      contents = query(value, contents);
-    }
+    // apply queries dynamicly from this.filters
+    for (const { type, value } of this.filters)
+      (filters[type] as Function)(value);
 
     // reset functions to reuse the query
-    this.functions = [];
-    return contents;
+    this.filters = [];
+    this.postprocess = [];
+
+    return filters.contents as (P | null)[];
   }
 }
