@@ -39,8 +39,5 @@ jobs:
       - name: Run Tests
         run: pnpm test
 
-      - name: Build Source
-        run: pnpm run build
-
       - name: Coverage
         uses: codecov/codecov-action@v1
