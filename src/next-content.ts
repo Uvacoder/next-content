@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import Utils from './lib/utils';
 import { QueryServer } from './lib/query-server';
-import { CompileOptions } from './lib/compiler';
+import { CompileOptions } from './lib/serialize';
 import { parseToc } from './lib/plugins';
 
 export interface NextContentOptions extends CompileOptions {
@@ -26,7 +26,7 @@ export interface ContentTemplate<T = Record<string, any>> {
   toc: { depth: number; text: string; id: string }[];
   extension: string;
   excerpt?: string;
-  slug: string;
+  slug: string[];
   text: string;
 }
 
@@ -46,15 +46,10 @@ export interface ContentOptions {
 class NextContentManager {
   private cwd: string = process.cwd();
   private base: string;
-  private tree: {
-    files: string[];
-    dirs: string[];
-  };
 
   constructor(public options: NextContentOptions) {
     this.options = { extensions: ['.mdx'], ...options };
     this.base = path.join(this.cwd, this.options.directory);
-    this.tree = this.makeTree();
   }
 
   private makeTree() {
@@ -105,18 +100,15 @@ class NextContentManager {
   }
 
   private paths(shortPath: string) {
-    const slug = (str: string) => {
-      // /articles/react/what-is-react.mdx to react/what-is-react.mdx
-      return path.join(...str.split('/').slice(2));
-    };
+    if (shortPath.startsWith('/')) shortPath = shortPath.slice(1);
 
     const noExt = Utils.removeExtension(shortPath);
 
     return {
-      path: noExt,
+      path: `/${noExt}`,
       extension: path.extname(shortPath),
-      dir: path.dirname(shortPath),
-      slug: slug(noExt),
+      dir: path.dirname(`/${shortPath}`),
+      slug: noExt.split('/'),
     };
   }
 
@@ -153,24 +145,32 @@ class NextContentManager {
 
     const fileOrDirectory = options ? params : params.concat(lastEl);
 
-    return { options, fileOrDirectory: fileOrDirectory as string[] };
+    return {
+      options: options ? options : {},
+      fileOrDirectory: fileOrDirectory as string[],
+    };
   }
 
   public content<T>(...pathOrOptions: [...string[], ContentOptions | string]) {
+    // read the up-to-date content files
+    const tree = this.makeTree();
+
     const { fileOrDirectory, options } = this.parseContentParams(pathOrOptions);
 
     const joinPath = path.join(...fileOrDirectory);
 
-    const isDirectory = this.tree.dirs.includes(joinPath);
+    let isDirectory = tree.dirs.includes(joinPath);
     const isFile = !isDirectory
       ? // is filename startswith joinPath
-        this.tree.files.some((n) => n.startsWith(joinPath))
+        tree.files.some((n) => n.startsWith(joinPath))
       : false;
-
+    if (joinPath === '.' || joinPath === './') {
+      isDirectory = true;
+    }
     const contents = [];
 
     if (isDirectory) {
-      const files = this.tree.files
+      const files = tree.files
         .map((name) => {
           // if the deep option is not enabled and the directory length is greater than 1 return null
           if (!options.deep && path.dirname(name).split('/').length > 1)
