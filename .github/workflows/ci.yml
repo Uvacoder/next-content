@@ -29,15 +29,18 @@ jobs:
         with:
           path: ~/.pnpm-store
           key: ${{ runner.os }}-node${{ matrix.node-version }}-${{ hashFiles('**/pnpm-lock.yaml') }}
-        
+
       - name: setup pnpm
         run: curl -f https://get.pnpm.io/v6.7.js | node - add --global pnpm@6
-        
+
       - name: Install dependencies
         run: pnpm install
 
       - name: Run Tests
         run: pnpm test
+
+      - name: Build Source
+        run: pnpm run build
 
       - name: Coverage
         uses: codecov/codecov-action@v1

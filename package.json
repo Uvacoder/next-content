@@ -8,12 +8,12 @@
     "dist"
   ],
   "scripts": {
-    "build": "rm -rf dist && npm run build:code && npm run build:types && npm run format && npm run clean:map",
+    "build": "rm -rf dist && npm run build:code && npm run build:types && npm run format",
     "build:types": "tsc --emitDeclarationOnly --declaration --declarationDir dist",
     "build:code": "swc src -s -d dist && prettier --write dist",
-    "clean:map": "rm -rf dist/**/*.map && rm -rf dist/*.map",
     "test": "jest",
     "format": "prettier --write {dist,src}",
+    "prepublish": "npm run build",
     "watch": "swc src -d dist -w"
   },
   "repository": {
