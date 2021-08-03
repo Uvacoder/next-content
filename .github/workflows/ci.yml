@@ -37,7 +37,7 @@ jobs:
         run: pnpm install
 
       - name: Run Tests
-        run: pnpm test
+        run: pnpm jest --coverage
 
       - name: Coverage
         uses: codecov/codecov-action@v1
