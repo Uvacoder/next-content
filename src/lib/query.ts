@@ -1,8 +1,9 @@
+//@ts-nocheck
 import Filters from './filters';
 
 // ---------------------------------------------------------------------- \\
 
-export class Query<P extends { data: Record<string, any> }> {
+export class Query<P> {
   private templates: P[];
   private filters: { type: keyof Filters; value: any }[] = [];
   private postprocess: (() => void)[] = [];
