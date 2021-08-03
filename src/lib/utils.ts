@@ -46,7 +46,7 @@ class Utils {
     for (const key in object) {
       const value = object[key];
 
-      if (typeof value === 'object') {
+      if (typeof value === 'object' && !Array.isArray(value)) {
         clone[key] = this.deepClone(value);
       } else {
         clone[key] = value;
@@ -66,11 +66,15 @@ class Utils {
     return clone;
   }
 
+  // reverse omit
   public static pick(object: Record<string, any>, whiteList: string[]) {
-    const blackList = whiteList.filter((path) => !(path in object));
+    const clone = this.deepClone(object);
 
-    // omit already clones object we don't need to clone it again
-    return this.omit(object, blackList);
+    for (const path of whiteList) {
+      this.set(clone, path, this.getValue(object, path));
+    }
+
+    return clone;
   }
 
   public static getValue(object: Record<string, any>, path: string) {
