@@ -19,8 +19,11 @@ export const ContentProvider: React.FC<ContentProviderProps> = ({
     return <ContentContext.Provider value={{ contents }} children={children} />;
 };
 
-export const useContentQuery = <T extends {}>() => {
-  const contents = useContext(ContentContext).contents as FetchResult<T>[];
+export const useContentQuery = <T extends {}>(
+  Contents: ContentProviderProps['contents']
+) => {
+  const contents = (useContext(ContentContext).contents ||
+    Contents) as FetchResult<T>[];
 
   return new QueryClient(contents);
 };
