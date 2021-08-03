@@ -76,3 +76,5 @@ export async function getStaticProps() {
 # Lisence
 
 MIT
+
+## This package doesn't published to npm.
