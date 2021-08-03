@@ -32,14 +32,14 @@ export interface CompileOptions {
   swcOptions?: swc.Options;
 }
 
-export type CompileOutput = string;
+export type SerializeOutput = string;
 
-export type Compile = (
+export type Serialize = (
   mdxSource: string,
   options?: CompileOptions
-) => Promise<CompileOutput>;
+) => Promise<SerializeOutput>;
 
-export const compile: Compile = async (mdxSource, options) => {
+export const serialize: Serialize = async (mdxSource, options) => {
   const mdxCompiledJsx = await MDXCompiler(mdxSource, {
     // can't overwrite the default options
     ...options?.mdxOptions,
