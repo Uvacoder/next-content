@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import type { CompileOutput } from './lib/compiler';
+import React, { useMemo, useState, useEffect } from 'react';
+import type { SerializeOutput } from './lib/serialize';
 import { MDXProvider, mdx } from '@mdx-js/react';
 
 export interface MDXComponentProps {
@@ -19,8 +19,7 @@ export interface MDXComponentProps {
    * @default {}
    */
   scope?: Record<string, unknown>;
-
-  compiledContent: CompileOutput;
+  compiledContent: SerializeOutput;
 }
 
 export const MDXComponent: React.FC<MDXComponentProps> = ({
@@ -34,11 +33,7 @@ export const MDXComponent: React.FC<MDXComponentProps> = ({
     const parameters = Object.keys(scopes); // mdx, React,  ...
     const parameterValues = Object.values(scopes); // require('@mdx-js/react').mdx, require('react'),  ...
 
-    // create a function with scopes as parameters like
-    // function hydrate(mdx, React, ...) {
-    //   ...MDXCompiledCode;
-    //   return MDXContent;
-    // }
+    // create a function with scopes as parameters.
     const returnMdxContentStatement = `${compiledContent}; return MDXContent;`;
     const hydrate = new Function(...parameters, returnMdxContentStatement);
 
