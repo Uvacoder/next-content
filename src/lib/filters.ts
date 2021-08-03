@@ -96,21 +96,25 @@ class Filters {
   // fn -> function
   // field -> string or undefined
   public process({ fn, field }) {
+    // for loop non-null contents
     for (let content of this.contents.filter((c) => c !== null)) {
       let fieldValue;
+
+      // get index of content
       const contentIndex = this.contents.indexOf(content);
 
+      // if field is string so not undefined, get value of content field
       if (typeof field === 'string')
         fieldValue = Utils.getValue(content, field);
 
+      // if fieldValue exist run fn with parameter fieldValue, if not run with content
       const boolOrValue = fn(fieldValue ? fieldValue : content);
+
+      // if returns false remove content from array
       if (boolOrValue === false) {
         this.contents.splice(contentIndex, 1);
-      } else if (
-        typeof boolOrValue !== 'boolean' &&
-        fieldValue &&
-        boolOrValue !== fieldValue
-      ) {
+        // if doesn't returns boolean and the fieldValue exist update key of field
+      } else if (typeof boolOrValue !== 'boolean' && fieldValue) {
         Utils.setKey(content, field, boolOrValue);
         // if the return type object and the field value is undefined replace the new content
       } else if (typeof boolOrValue === 'object' && !fieldValue) {
