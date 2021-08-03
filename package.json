@@ -8,7 +8,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "rm -rf dist && npm run build:code && npm run build:types && npm run format",
+    "build": "rm -rf dist && npm run build:code && npm run build:types",
     "build:types": "tsc --emitDeclarationOnly --declaration --declarationDir dist",
     "build:code": "swc src -s -d dist && prettier --write dist",
     "test": "jest",
