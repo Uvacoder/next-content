@@ -1,4 +1,9 @@
 {
+  "env": {
+    "targets": {
+      "node": "12"
+    }
+  },
   "module": {
     "type": "commonjs"
   },
@@ -6,8 +11,7 @@
     "parser": {
       "syntax": "typescript",
       "tsx": true
-    },
-    "target": "es2020"
+    }
   },
   "sourceMaps": false
 }
