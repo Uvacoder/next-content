@@ -9,4 +9,8 @@ export class QueryClient<T> extends Query<FetchResult<T>> {
   public fetch() {
     return this.apply();
   }
+
+  public first() {
+    return this.fetch()[0];
+  }
 }
