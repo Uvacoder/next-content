@@ -1,7 +1,7 @@
 {
   "name": "next-content",
   "version": "0.1.0-beta",
-  "description": "Get your MDX files from specific dir and filter easily",
+  "description": "A Content manager for Next.js framework",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
@@ -32,7 +32,7 @@
   "bugs": {
     "url": "https://github.com/healthpackdev/next-content/issues"
   },
-  "homepage": "next-content.vercel.app",
+  "homepage": "https://github.com/healthpack/next-content#readme",
   "dependencies": {
     "@mdx-js/mdx": "^1.6.22",
     "@mdx-js/react": "^1.6.22",
@@ -50,10 +50,7 @@
     "@types/react": "^17.0.15",
     "chokidar": "^3.5.2",
     "jest": "^27.0.6",
-    "next": "^11.0.1",
     "prettier": "^2.3.2",
-    "react": "^17.0.2",
-    "react-dom": "^17.0.2",
     "react-test-renderer": "^17.0.2",
     "typescript": "^4.3.5",
     "unified": "^10.0.1"
