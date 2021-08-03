@@ -114,8 +114,8 @@ class Filters {
         Utils.setKey(content, field, boolOrValue);
         // if the return type object and the field value is undefined replace the new content
       } else if (typeof boolOrValue === 'object' && !fieldValue) {
-        this.contents.splice(contentIndex, 1); // delete content
-        this.contents.splice(contentIndex, 1, boolOrValue); // replace position with new content
+        // replace position with new content
+        this.contents.splice(contentIndex, 1, boolOrValue);
       }
     }
   }
