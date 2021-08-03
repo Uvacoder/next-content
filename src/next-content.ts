@@ -49,7 +49,7 @@ class NextContentManager {
 
   constructor(public options: NextContentOptions) {
     this.options = { extensions: ['.mdx'], ...options };
-    this.base = path.join(this.cwd, this.options.directory);
+    this.base = this.join(this.cwd, this.options.directory);
   }
 
   private makeTree() {
@@ -74,8 +74,13 @@ class NextContentManager {
     };
   }
 
+  // transform windows path to unix paths.
+  private join(...paths: string[]) {
+    return path.posix.join(...paths);
+  }
+
   private path(...paths: string[]) {
-    return path.join(this.base, ...paths);
+    return this.join(this.base, ...paths);
   }
 
   private withExtension(path: string) {
@@ -157,16 +162,18 @@ class NextContentManager {
 
     const { fileOrDirectory, options } = this.parseContentParams(pathOrOptions);
 
-    const joinPath = path.join(...fileOrDirectory);
+    const joinPath = this.join(...fileOrDirectory);
 
     let isDirectory = tree.dirs.includes(joinPath);
     const isFile = !isDirectory
       ? // is filename startswith joinPath
         tree.files.some((n) => n.startsWith(joinPath))
       : false;
+
     if (joinPath === '.' || joinPath === './') {
       isDirectory = true;
     }
+
     const contents = [];
 
     if (isDirectory) {
@@ -186,7 +193,7 @@ class NextContentManager {
       const file = this.withExtension(joinPath);
 
       // join paths
-      const shortPath = path.join(file);
+      const shortPath = this.join(file);
 
       contents.push(this.readContent(shortPath));
     } else {
