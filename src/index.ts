@@ -1,3 +1,2 @@
-export * from './component';
+// export server-side only
 export * from './next-content';
-export * from './use-content';
