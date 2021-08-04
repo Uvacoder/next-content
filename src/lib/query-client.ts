@@ -13,4 +13,8 @@ export class QueryClient<T> extends Query<FetchResult<T>> {
   public first() {
     return this.fetch()[0];
   }
+
+  public params() {
+    return this.only(['path', 'slug']).fetch();
+  }
 }
