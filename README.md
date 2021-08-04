@@ -309,7 +309,7 @@ function Page({ myContent, myExternalData }) {
 }
 ```
 
-</detaişs>
+</details>
 
 # Query API
 
