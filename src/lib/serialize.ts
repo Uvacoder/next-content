@@ -26,7 +26,6 @@ export interface CompileOptions {
     rehypePlugins?: Pluggable[];
     hastPlugins?: Pluggable[];
     compilers?: Compiler[];
-    filepath?: string;
   };
 
   swcOptions?: swc.Options;
