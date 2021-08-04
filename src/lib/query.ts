@@ -12,6 +12,10 @@ export class Query<P> {
     this.templates = contents;
   }
 
+  /**
+   * @description skips the first n items
+   * @returns this instance
+   */
   public skip(number: number) {
     this.filters.push({
       type: 'skip',
@@ -21,6 +25,10 @@ export class Query<P> {
     return this;
   }
 
+  /**
+   * @description gets only the first n items
+   * @returns this instance
+   */
   public limit(number: number) {
     this.filters.push({
       type: 'limit',
@@ -30,6 +38,10 @@ export class Query<P> {
     return this;
   }
 
+  /**
+   * @description includes only specified fields.
+   * @returns this instance
+   */
   public only(fields: (keyof P | `data.${keyof P['data']}`)[]) {
     this.filters.push({
       type: 'only',
@@ -131,6 +143,10 @@ export class Query<P> {
     return this;
   }
 
+  /**
+   * @description process a field or full content
+   * @returns this instance
+   */
   process(
     field:
       | keyof P
